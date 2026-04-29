@@ -125,7 +125,7 @@ fun SplashScreen(onFinish: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "📍 Fortaleza, Ceará",
+                text = "📍 Grande Bom Jardim, Fortaleza",
                 color = Color.White.copy(alpha = 0.6f),
                 style = MaterialTheme.typography.bodyMedium
             )

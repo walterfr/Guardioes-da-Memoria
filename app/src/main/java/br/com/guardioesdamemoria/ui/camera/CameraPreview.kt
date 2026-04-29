@@ -251,7 +251,7 @@ fun CameraPreviewContent(viewModel: LocationViewModel) {
         ) {
             Column {
                 Text(
-                    text = "📍 FORTALEZA / B. ELLERY",
+                    text = "📍 GRANDE BOM JARDIM",
                     color = Color.White,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold
