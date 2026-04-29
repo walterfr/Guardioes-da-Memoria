@@ -1,0 +1,35 @@
+# Android Studio / IntelliJ
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Gradle
+.gradle/
+build/
+
+# Kotlin
+.kotlin/
+
+# Generated files
+/app/build/
+/build/
+
+# Misc
+*.log
+.vscode/
+.gemini/
+codigo_completo*.txt
+consolidate_code.ps1
+collect_code.py
