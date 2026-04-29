@@ -36,6 +36,8 @@ fun RegistrationScreen(
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var authorName by remember { mutableStateOf("") }
+    var authorAge by remember { mutableStateOf("") }
+    var imageSource by remember { mutableStateOf("") }
     var year by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Geral") }
     
@@ -56,7 +58,7 @@ fun RegistrationScreen(
 
     val recordingTime by viewModel.recordingTime.collectAsState()
 
-    val categories = listOf("Enchente", "Seca", "Tempestade", "Ciclone", "Geral")
+    val categories = listOf("Enchente", "Seca", "Tempestade", "Ciclone", "Historico de Morador", "Memoria Afetiva", "Geral")
     var expanded by remember { mutableStateOf(false) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -79,7 +81,7 @@ fun RegistrationScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Cadastrar Memória") },
+                title = { Text("Registrar Memória", fontWeight = FontWeight.Black) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
@@ -97,22 +99,21 @@ fun RegistrationScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Nova Memória",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Black,
-                modifier = Modifier.padding(bottom = 8.dp)
+                text = "FICHA DE INVESTIGAÇÃO",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
             )
 
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Título da Memória *") },
+                label = { Text("Título do Relato *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp)
             )
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Categoria Dropdown
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = !expanded },
@@ -122,7 +123,7 @@ fun RegistrationScreen(
                         value = category,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Categoria") },
+                        label = { Text("Tipo de Memória") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp)
@@ -152,38 +153,41 @@ fun RegistrationScreen(
                 )
             }
 
-            OutlinedTextField(
-                value = authorName,
-                onValueChange = { authorName = it },
-                label = { Text("Nome do Morador (Narrador)") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = authorName,
+                    onValueChange = { authorName = it },
+                    label = { Text("Nome do Entrevistado") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                OutlinedTextField(
+                    value = authorAge,
+                    onValueChange = { authorAge = it },
+                    label = { Text("Idade") },
+                    modifier = Modifier.weight(0.4f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+            }
 
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Relato (Descrição) *") },
+                label = { Text("Relato e Observações *") },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
+                minLines = 4,
                 shape = RoundedCornerShape(16.dp)
             )
 
-            // Seleção de Imagem
+            // Seleção de Imagem e Fonte
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    photoPickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                }
+                shape = RoundedCornerShape(20.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Evidência Visual", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
                     if (imageUrl != null) {
                         AsyncImage(
                             model = imageUrl,
@@ -194,23 +198,46 @@ fun RegistrationScreen(
                                 .clip(RoundedCornerShape(12.dp)),
                             contentScale = ContentScale.Crop
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Clique para trocar a foto", style = MaterialTheme.typography.bodySmall)
-                    } else {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(32.dp))
-                        Text("Adicionar Foto Histórica")
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
+                    
+                    Button(
+                        onClick = {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (imageUrl == null) "Anexar Foto Histórica" else "Trocar Foto")
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    OutlinedTextField(
+                        value = imageSource,
+                        onValueChange = { imageSource = it },
+                        label = { Text("Fonte/Crédito da Imagem") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        textStyle = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
 
-            // Seleção / Gravação de Áudio
+            // Gravação de Áudio
             Card(
                 modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isRecording) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Entrevista / Relato Oral", style = MaterialTheme.typography.titleMedium)
+                    
                     if (isRecording) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -238,14 +265,7 @@ fun RegistrationScreen(
                         Button(
                             onClick = {
                                 if (isRecording) {
-                                    val path = viewModel.stopRecording()
-                                    audioUrl = path
-                                    if (path != null) {
-                                        val file = java.io.File(path)
-                                        val sizeMb = file.length() / (1024f * 1024f)
-                                        // Poderia usar um Toast aqui, mas vamos apenas atualizar o estado
-                                        println("Gravação concluída! Tamanho: ${"%.2f".format(sizeMb)} MB")
-                                    }
+                                    audioUrl = viewModel.stopRecording()
                                 } else {
                                     audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                                 }
@@ -255,32 +275,32 @@ fun RegistrationScreen(
                                 containerColor = if (isRecording) Color.Red else MaterialTheme.colorScheme.primary
                             )
                         ) {
-                            Text(if (isRecording) "Parar" else "Gravar")
+                            Text(if (isRecording) "PARAR" else "GRAVAR VOZ")
                         }
 
                         OutlinedButton(
                             onClick = { audioPickerLauncher.launch("audio/*") },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Arquivo")
+                            Text("ARQUIVO")
                         }
                     }
                 }
             }
 
+            // Localização
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Localização", style = MaterialTheme.typography.titleMedium)
+                        Text("Georreferenciamento", style = MaterialTheme.typography.titleMedium)
                         Button(onClick = {
                             currentLocation?.let {
                                 latitude = it.latitude
@@ -289,23 +309,24 @@ fun RegistrationScreen(
                         }) {
                             Icon(Icons.Default.LocationOn, contentDescription = null)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Capturar")
+                            Text("Capturar GPS")
                         }
                     }
                     if (latitude != null) {
-                        Text("📍 Lat: ${"%.4f".format(latitude)}, Long: ${"%.4f".format(longitude)}", style = MaterialTheme.typography.bodySmall)
+                        Text("📍 Coordenadas: ${"%.6f".format(latitude)}, ${"%.6f".format(longitude)}", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = { showPrivacyDialog = true },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
                 enabled = title.isNotBlank() && description.isNotBlank() && latitude != null && !isRecording
             ) {
-                Text("Continuar para Salvamento")
+                Text("FINALIZAR PESQUISA", fontWeight = FontWeight.Black)
             }
         }
     }
@@ -313,14 +334,14 @@ fun RegistrationScreen(
     if (showPrivacyDialog) {
         AlertDialog(
             onDismissRequest = { showPrivacyDialog = false },
-            title = { Text("Privacidade e Ética") },
+            title = { Text("Ética e Privacidade") },
             text = {
                 Column {
-                    Text("Esta memória será georreferenciada para que outros membros da comunidade possam encontrá-la no mapa. Você confirma que tem permissão para compartilhar este relato?")
+                    Text("Esta memória será georreferenciada e compartilhada com a rede 'Guardiões da Memória'. Você confirma que obteve o consentimento do entrevistado?")
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = isGeoreferenceConsented, onCheckedChange = { isGeoreferenceConsented = it })
-                        Text("Consinto com o georreferenciamento", style = MaterialTheme.typography.bodySmall)
+                        Text("Sim, possuo consentimento gravado/assinado", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             },
@@ -332,7 +353,7 @@ fun RegistrationScreen(
                         showPinDialog = true
                     }
                 ) {
-                    Text("Prosseguir")
+                    Text("Confirmar")
                 }
             },
             dismissButton = {
@@ -344,15 +365,15 @@ fun RegistrationScreen(
     if (showPinDialog) {
         AlertDialog(
             onDismissRequest = { showPinDialog = false },
-            title = { Text("Modo Professor") },
+            title = { Text("Validação do Orientador") },
             text = {
                 Column {
-                    Text("Digite o PIN para salvar o cadastro:")
+                    Text("Para evitar spam, o salvamento requer o PIN do Professor/Orientador:")
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = pinInput,
                         onValueChange = { pinInput = it },
-                        label = { Text("PIN") },
+                        label = { Text("PIN de Segurança") },
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -360,12 +381,13 @@ fun RegistrationScreen(
             },
             confirmButton = {
                 Button(onClick = {
-                    if (pinInput == "1234") { // PIN simples de exemplo
+                    // Simulação de PIN vindo de SharedPreferences ou Constant
+                    if (pinInput == "2024") { 
                         viewModel.saveNewMemory(title, description, category, year, authorName, latitude!!, longitude!!, imageUrl, audioUrl)
                         onBack()
                     }
                 }) {
-                    Text("Confirmar")
+                    Text("Validar e Salvar")
                 }
             }
         )

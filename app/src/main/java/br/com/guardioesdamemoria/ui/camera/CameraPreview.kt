@@ -9,12 +9,8 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -27,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -95,7 +92,8 @@ fun CameraScreen(
             if (hasPermissions) {
                 FloatingActionButton(
                     onClick = onNavigateToRegistration,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    shape = CircleShape
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Adicionar Memória")
                 }
@@ -147,6 +145,9 @@ fun CameraPreviewContent(viewModel: LocationViewModel) {
     val recentBadge by viewModel.recentBadge.collectAsState()
     val audioProgress by viewModel.audioProgress.collectAsState()
     val distanceToActive by viewModel.distanceToActive.collectAsState()
+    
+    // Estado para o Slider de Realidade (Antes x Depois)
+    var imageAlpha by remember { mutableStateOf(0.45f) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
@@ -191,7 +192,7 @@ fun CameraPreviewContent(viewModel: LocationViewModel) {
 
         AnimatedVisibility(
             visible = activeMemory?.imageUrl != null,
-            enter = fadeIn(animationSpec = tween(1000)),
+            enter = fadeIn(animationSpec = tween(1500)) + expandVertically(),
             exit = fadeOut()
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -204,21 +205,36 @@ fun CameraPreviewContent(viewModel: LocationViewModel) {
                         .height(adaptiveHeight)
                         .align(Alignment.Center)
                         .graphicsLayer(
-                            alpha = 0.45f,
+                            alpha = imageAlpha,
                             scaleX = pulseScale,
                             scaleY = pulseScale
                         ),
                     contentScale = ContentScale.Crop
                 )
+                
+                // Slider Antes x Depois ( HUD Mission Style)
+                Column(
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp).height(200.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("PASSADO", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    Slider(
+                        value = imageAlpha,
+                        onValueChange = { imageAlpha = it },
+                        modifier = Modifier.graphicsLayer(rotationZ = 270f).width(120.dp),
+                        valueRange = 0f..1f
+                    )
+                    Text("AGORA", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                }
             }
         }
 
-        // Camada de gradiente para contraste
+        // Camada de gradiente para contraste HUD
         Box(
             modifier = Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color.Black.copy(alpha = 0.7f),
+                        Color.Black.copy(alpha = 0.8f),
                         Color.Transparent,
                         Color.Transparent,
                         Color.Black.copy(alpha = 0.9f)
@@ -227,51 +243,62 @@ fun CameraPreviewContent(viewModel: LocationViewModel) {
             )
         )
 
-        // Cabeçalho Premium
-        Column(
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 56.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        // HUD SUPERIOR (Estilo Jogo/Missão)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 56.dp, start = 20.dp, end = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "GUARDIÕES DA MEMÓRIA",
-                color = Color.White,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 2.sp
-            )
+            Column {
+                Text(
+                    text = "📍 FORTALEZA / B. ELLERY",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = if (activeMemory != null) "✨ MEMÓRIA DETECTADA" else "📡 BUSCANDO SINAIS...",
+                    color = if (activeMemory != null) Color.Yellow else Color.White.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
             
-            // Indicador de Proximidade "Glass"
-            distanceToActive?.let { dist ->
-                Surface(
-                    modifier = Modifier.padding(top = 16.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    color = (if (dist < 12) Color(0xFF4CAF50) else Color.White).copy(alpha = 0.25f),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
-                ) {
-                    Text(
-                        text = if (dist < 12) "📍 VOCÊ CHEGOU!" else "📍 a ${dist.toInt()} metros",
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White.copy(alpha = 0.15f),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+            ) {
+                Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Star, contentDescription = null, tint = Color.Yellow, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "XP: $userPoints", color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp)
                 }
             }
         }
-        
-        // Pontuação "Glass"
-        Box(modifier = Modifier.align(Alignment.TopEnd).padding(top = 56.dp, end = 20.dp)) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
+
+        // RADAR PULSANTE (Centro)
+        if (activeMemory == null) {
+            val radarTransition = rememberInfiniteTransition()
+            val radarAlpha by radarTransition.animateFloat(
+                initialValue = 0.6f,
+                targetValue = 0f,
+                animationSpec = infiniteRepeatable(animation = tween(2000), repeatMode = RepeatMode.Restart)
+            )
+            val radarScale by radarTransition.animateFloat(
+                initialValue = 0.5f,
+                targetValue = 2f,
+                animationSpec = infiniteRepeatable(animation = tween(2000), repeatMode = RepeatMode.Restart)
+            )
+
+            Box(
+                modifier = Modifier.align(Alignment.Center).size(200.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "⭐ $userPoints",
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    fontWeight = FontWeight.Black,
-                    color = Color.White
+                Box(
+                    modifier = Modifier.fillMaxSize().graphicsLayer(scaleX = radarScale, scaleY = radarScale, alpha = radarAlpha)
+                        .background(Color.Cyan.copy(alpha = 0.3f), CircleShape)
                 )
+                Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color.Cyan.copy(alpha = 0.8f), modifier = Modifier.size(48.dp))
             }
         }
         
@@ -280,7 +307,7 @@ fun CameraPreviewContent(viewModel: LocationViewModel) {
             visible = recentBadge != null,
             enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 140.dp)
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 120.dp)
         ) {
             recentBadge?.let { badge ->
                 Card(
@@ -292,7 +319,7 @@ fun CameraPreviewContent(viewModel: LocationViewModel) {
                         Text(text = badge.icon, style = MaterialTheme.typography.displaySmall)
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
-                            Text("NOVA INSÍGNIA!", style = MaterialTheme.typography.labelSmall, color = Color.Black.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
+                            Text("CONQUISTA DESBLOQUEADA!", style = MaterialTheme.typography.labelSmall, color = Color.Black.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
                             Text(badge.title, style = MaterialTheme.typography.titleLarge, color = Color.Black, fontWeight = FontWeight.Black)
                         }
                     }
@@ -300,7 +327,7 @@ fun CameraPreviewContent(viewModel: LocationViewModel) {
             }
         }
 
-        // Overlay de Memória Ativa (Card Glassmorphism)
+        // Overlay de Memória Ativa (Arquivo Histórico Aesthetic)
         AnimatedVisibility(
             visible = activeMemory != null,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -309,27 +336,33 @@ fun CameraPreviewContent(viewModel: LocationViewModel) {
         ) {
             activeMemory?.let { memory ->
                 Card(
-                    modifier = Modifier.padding(20.dp).fillMaxWidth(),
+                    modifier = Modifier.padding(20.dp).fillMaxWidth()
+                        .drawBehind {
+                            // Efeito de borda "brilhante" ao detectar
+                            drawRoundRect(
+                                color = Color.Yellow.copy(alpha = 0.3f),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(32.dp.toPx()),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4.dp.toPx())
+                            )
+                        },
                     shape = RoundedCornerShape(32.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.15f)),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFDF5E6)), // Cor de papel antigo/pergaminho
+                    elevation = CardDefaults.cardElevation(defaultElevation = 20.dp)
                 ) {
                     Column(modifier = Modifier.padding(24.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Card(
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = when (memory.category) {
-                                            "Enchente" -> ColorEnchente
-                                            "Seca" -> ColorSeca
-                                            "Tempestade" -> ColorTempestade
-                                            else -> ColorGeral
-                                        }
-                                    ),
-                                    shape = RoundedCornerShape(6.dp)
+                                Surface(
+                                    color = when (memory.category) {
+                                        "Enchente" -> ColorEnchente
+                                        "Seca" -> ColorSeca
+                                        "Tempestade" -> ColorTempestade
+                                        else -> ColorGeral
+                                    },
+                                    shape = RoundedCornerShape(4.dp)
                                 ) {
                                     Text(
-                                        text = memory.category.uppercase(),
+                                        text = "ARQUIVO: ${memory.category.uppercase()}",
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color.White,
@@ -339,7 +372,7 @@ fun CameraPreviewContent(viewModel: LocationViewModel) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = memory.title,
-                                    color = Color.White,
+                                    color = Color(0xFF3E2723), // Marrom café profundo
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Black
                                 )
@@ -347,35 +380,53 @@ fun CameraPreviewContent(viewModel: LocationViewModel) {
                             
                             IconButton(
                                 onClick = { viewModel.dismissActiveMemory() },
-                                modifier = Modifier.background(Color.White.copy(alpha = 0.2f), CircleShape)
+                                modifier = Modifier.background(Color.Black.copy(alpha = 0.1f), CircleShape)
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = "Fechar", tint = Color.White)
+                                Icon(Icons.Default.Close, contentDescription = "Fechar", tint = Color.Black)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Informações do Narrador (Estilo Ficha)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF5D4037), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "NARRADOR: ${if (memory.authorName.isNotBlank()) memory.authorName else "DESCONHECIDO"}",
+                                color = Color(0xFF5D4037),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (memory.year.isNotBlank()) {
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(text = "|", color = Color.Black.copy(alpha = 0.2f))
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(text = "ANO: ${memory.year}", color = Color(0xFF5D4037), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                             }
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        // Legendas Dinâmicas (Efeito Karaoke)
+                        // Legendas Dinâmicas (Karaoke com estilo de papel)
                         Box(
                             modifier = Modifier.fillMaxWidth()
-                                .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                                .background(Color.Black.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
                                 .padding(16.dp)
                         ) {
                             Text(
                                 text = buildAnnotatedString {
                                     val textStr = memory.description
                                     if (spokenRange != null && spokenRange!!.second <= textStr.length) {
-                                        // Texto já falado (Highlight)
-                                        withStyle(style = SpanStyle(color = Color.Yellow, fontWeight = FontWeight.Bold)) {
+                                        withStyle(style = SpanStyle(color = Color(0xFFB8860B), fontWeight = FontWeight.Bold)) {
                                             append(textStr.substring(0, spokenRange!!.second))
                                         }
-                                        // Resto do texto
                                         append(textStr.substring(spokenRange!!.second))
                                     } else {
                                         append(textStr)
                                     }
                                 },
-                                color = Color.White.copy(alpha = 0.8f),
+                                color = Color(0xFF4E342E),
                                 style = MaterialTheme.typography.bodyLarge,
                                 maxLines = 5
                             )
@@ -383,66 +434,43 @@ fun CameraPreviewContent(viewModel: LocationViewModel) {
 
                         Spacer(modifier = Modifier.height(20.dp))
 
-                        // Barra de Áudio Glass
-                        Column(modifier = Modifier.fillMaxWidth()) {
+                        // Barra de Áudio (Estilo Analógico)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            FilledIconButton(
+                                onClick = { viewModel.togglePlayback() },
+                                modifier = Modifier.size(48.dp),
+                                colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFF3E2723))
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = "Play/Pause", tint = Color.White)
+                            }
+                            
+                            Spacer(modifier = Modifier.width(16.dp))
+                            
                             LinearProgressIndicator(
                                 progress = { audioProgress },
-                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
-                                color = Color.Yellow,
-                                trackColor = Color.White.copy(alpha = 0.2f)
+                                modifier = Modifier.weight(1f).height(4.dp).clip(CircleShape),
+                                color = Color(0xFF8B4513),
+                                trackColor = Color.Black.copy(alpha = 0.1f)
                             )
-                            
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Person, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = if (memory.authorName.isNotBlank()) memory.authorName else "Relato Local",
-                                        color = Color.White.copy(alpha = 0.6f),
-                                        style = MaterialTheme.typography.labelMedium
-                                    )
-                                }
-                                
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    FilledIconButton(
-                                        onClick = { viewModel.togglePlayback() },
-                                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White.copy(alpha = 0.2f))
-                                    ) {
-                                        Icon(Icons.Default.PlayArrow, contentDescription = "Play/Pause", tint = Color.White)
-                                    }
-                                }
-                            }
                         }
                     }
                 }
             }
         }
 
-        // Estado de Busca "Glass"
+        // Dica de Exploração HUD
         if (activeMemory == null) {
-            Surface(
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp).padding(horizontal = 24.dp),
-                shape = RoundedCornerShape(24.dp),
-                color = Color.White.copy(alpha = 0.15f),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = Color.White.copy(alpha = 0.7f)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Text(text = "Explorando memórias próximas...", color = Color.White, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
+            Text(
+                text = "MOVA A CÂMERA PARA ENCONTRAR SINAIS HISTÓRICOS",
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 100.dp),
+                color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
         }
     }
 }
