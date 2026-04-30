@@ -5,11 +5,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -30,7 +33,7 @@ import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(viewModel: LocationViewModel) {
+fun LibraryScreen(viewModel: LocationViewModel, onNavigateToRegistration: () -> Unit = {}) {
     val memories by viewModel.memories.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var selectedDecade by remember { mutableStateOf<String?>(null) }
@@ -39,46 +42,47 @@ fun LibraryScreen(viewModel: LocationViewModel) {
 
     val filteredMemories = memories.filter { 
         val matchesSearch = it.title.contains(searchQuery, ignoreCase = true) || 
-                          it.category.contains(searchQuery, ignoreCase = true)
+                          it.category.contains(searchQuery, ignoreCase = true) ||
+                          it.authorName.contains(searchQuery, ignoreCase = true) ||
+                          it.year.contains(searchQuery)
+        
         val matchesDecade = if (selectedDecade == null) true else {
-            it.year.startsWith(selectedDecade!!.substring(0, 3))
+            // BUG FIX: it.year.dropLast(1) == selectedDecade!!.dropLast(1)
+            // se year for "1974" e selectedDecade for "1970", dropLast(1) dá "197" == "197"
+            it.year.isNotBlank() && it.year.dropLast(1) == selectedDecade!!.dropLast(1)
         }
         matchesSearch && matchesDecade
     }
 
+    val featuredMemories = memories.take(3) // Exemplo: Primeiras 3 são destaque
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
-                    Column {
-                        Text("Acervo Comunitário", fontWeight = FontWeight.Black)
-                        Text("Explorando a linha do tempo", style = MaterialTheme.typography.labelSmall)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                title = { Text("Acervo Comunitário", fontWeight = FontWeight.Black) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = NightField, titleContentColor = Color.White)
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+        Column(modifier = Modifier.padding(padding).fillMaxSize().background(NightField)) {
             // Barra de Busca
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text("Buscar no arquivo...") },
+                placeholder = { Text("Buscar por título, autor, ano...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
+                    focusedContainerColor = Color.White.copy(alpha = 0.1f),
+                    unfocusedBorderColor = Color.Transparent
+                )
             )
 
-            // Filtro de Décadas (Timeline)
+            // Timeline (Décadas)
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
@@ -97,16 +101,42 @@ fun LibraryScreen(viewModel: LocationViewModel) {
 
             if (filteredMemories.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Nenhum relato encontrado neste período.", style = MaterialTheme.typography.bodyLarge)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.White.copy(alpha = 0.2f))
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Nenhum relato encontrado.", color = Color.White.copy(alpha = 0.5f))
+                        Text(
+                            "Que tal ser o primeiro a registrar?", 
+                            color = MemoryTeal, 
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.clickable { onNavigateToRegistration() }
+                        )
+                    }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
+                    // SEÇÃO EM DESTAQUE (Polaroids)
+                    if (selectedDecade == null && searchQuery.isBlank()) {
+                        item {
+                            Text("EM DESTAQUE", modifier = Modifier.padding(16.dp), color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                items(featuredMemories) { memory ->
+                                    PolaroidCard(memory)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Text("TODOS OS RELATOS", modifier = Modifier.padding(horizontal = 16.dp), color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
                     items(filteredMemories) { memory ->
-                        MemoryItemCard(memory)
+                        MemoryItemCard(memory, onPlay = { viewModel.togglePlayback() })
                     }
                 }
             }
@@ -115,83 +145,54 @@ fun LibraryScreen(viewModel: LocationViewModel) {
 }
 
 @Composable
-fun MemoryItemCard(memory: Memory) {
+fun PolaroidCard(memory: Memory) {
+    // Polaroid Style Card (Levemente rotacionado)
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFDF5E6)), // Estilo Papel Antigo
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        modifier = Modifier.width(160.dp).graphicsLayer(rotationZ = -2f),
+        shape = RoundedCornerShape(4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Box(modifier = Modifier.height(220.dp)) {
-            // Foto de Fundo
-            if (memory.imageUrl != null) {
-                AsyncImage(
-                    model = memory.imageUrl,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize().graphicsLayer(alpha = 0.9f),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(modifier = Modifier.fillMaxSize().background(Color(0xFFD2B48C))) // Tan color
-            }
-            
-            // Gradiente para legibilidade (Estilo Vinheta)
-            Box(
-                modifier = Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.9f)),
-                        startY = 300f
-                    )
-                )
+        Column(modifier = Modifier.padding(8.dp)) {
+            AsyncImage(
+                model = memory.imageUrl,
+                contentDescription = null,
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(2.dp)),
+                contentScale = ContentScale.Crop
             )
-            
-            // Conteúdo
-            Column(
-                modifier = Modifier.align(Alignment.BottomStart).padding(20.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        color = when (memory.category) {
-                            "Enchente" -> ColorEnchente
-                            "Seca" -> ColorSeca
-                            "Tempestade" -> ColorTempestade
-                            else -> ColorGeral
-                        },
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = memory.category.uppercase(),
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    if (memory.year.isNotBlank()) {
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(text = "DÉCADA: ${memory.year.substring(0, 3)}0s", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = memory.title,
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Black
-                )
-                Text(
-                    text = "Narrado por: ${if (memory.authorName.isNotBlank()) memory.authorName else "Comunidade"}",
-                    color = Color.White.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.bodySmall
-                )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(memory.title, color = Color.Black, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black, maxLines = 1)
+            Text(memory.category, color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(memory.year, color = Color.Black, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.End))
+        }
+    }
+}
+
+@Composable
+fun MemoryItemCard(memory: Memory, onPlay: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f))
+    ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(
+                model = memory.imageUrl,
+                contentDescription = null,
+                modifier = Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(memory.title, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("${memory.category} • ${memory.authorName}", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
+                Text(memory.year, color = MemoryTeal, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             }
             
-            // Selo de "Arquivo"
-            Box(
-                modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
-                    .size(44.dp).clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
+            // Botão de Play direto no card
+            FilledIconButton(
+                onClick = onPlay,
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MemoryTeal)
             ) {
                 Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
             }

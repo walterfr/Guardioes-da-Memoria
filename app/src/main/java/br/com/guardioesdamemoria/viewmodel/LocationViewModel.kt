@@ -27,6 +27,7 @@ import br.com.guardioesdamemoria.data.local.AppDatabase
 import br.com.guardioesdamemoria.data.local.MemoryEntity
 
 import br.com.guardioesdamemoria.util.AudioRecorder
+import br.com.guardioesdamemoria.util.DatabaseExporter
 import android.media.MediaPlayer
 import java.io.File
 
@@ -58,6 +59,15 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
     private val _memories = MutableStateFlow<List<Memory>>(emptyList())
     val memories: StateFlow<List<Memory>> = _memories.asStateFlow()
 
+    private val _nearestMemoryDistance = MutableStateFlow<Float?>(null)
+    val nearestMemoryDistance: StateFlow<Float?> = _nearestMemoryDistance.asStateFlow()
+
+    private val _nearestMemoryBearing = MutableStateFlow<Float?>(null)
+    val nearestMemoryBearing: StateFlow<Float?> = _nearestMemoryBearing.asStateFlow()
+
+    private val _pendingMemories = MutableStateFlow<List<Memory>>(emptyList())
+    val pendingMemories: StateFlow<List<Memory>> = _pendingMemories.asStateFlow()
+
     private val _audioProgress = MutableStateFlow(0f)
     val audioProgress: StateFlow<Float> = _audioProgress.asStateFlow()
 
@@ -85,12 +95,69 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
     private val _newMemoriesCount = MutableStateFlow(0)
     val newMemoriesCount: StateFlow<Int> = _newMemoriesCount.asStateFlow()
 
+    private var teacherPin: String = "2024" // PIN padrão inicial
+
     private var tts: TextToSpeech? = null
     private var isTtsReady = false
 
     init {
         tts = TextToSpeech(application, this)
         loadMemoriesFromDb()
+        checkAndInsertDemoMemories()
+    }
+
+    private fun checkAndInsertDemoMemories() {
+        viewModelScope.launch {
+            val current = memoryDao.getAllMemoriesOnce()
+            if (current.isEmpty()) {
+                val demoMemories = listOf(
+                    MemoryEntity(
+                        title = "O Grande Alagamento de 85",
+                        description = "Nesse ano a água chegou no peito. Lembro de ver os vizinhos se ajudando com canoas improvisadas. Foi um tempo de muita luta, mas de muita união no Bom Jardim.",
+                        category = "Alagamento",
+                        year = "1985",
+                        authorName = "Seu Zé do Egito",
+                        authorAge = "74",
+                        latitude = -3.7915,
+                        longitude = -38.5990,
+                        triggerRadiusMeters = 100.0,
+                        imageUrl = "android.resource://${getApplication<Application>().packageName}/drawable/memoria_alagamento",
+                        isApproved = true,
+                        createdAt = System.currentTimeMillis()
+                    ),
+                    MemoryEntity(
+                        title = "Chegada do Saneamento",
+                        description = "As obras eram barulhentas e traziam muita poeira, mas sabíamos que era o progresso chegando. Foi quando o bairro começou a ter cara de cidade.",
+                        category = "Transtornos de Obras",
+                        year = "1994",
+                        authorName = "Dona Maria da Penha",
+                        authorAge = "62",
+                        latitude = -3.7920,
+                        longitude = -38.5980,
+                        triggerRadiusMeters = 80.0,
+                        imageUrl = "android.resource://${getApplication<Application>().packageName}/drawable/memoria_obras",
+                        isApproved = true,
+                        createdAt = System.currentTimeMillis()
+                    ),
+                    MemoryEntity(
+                        title = "Resiliência no Morro",
+                        description = "A chuva derrubou algumas casas, mas a comunidade se uniu para reconstruir tudo. O Bom Jardim é feito de gente que não desiste.",
+                        category = "Desmoronamento",
+                        year = "2002",
+                        authorName = "Raimundo Nonato",
+                        authorAge = "45",
+                        latitude = -3.7910,
+                        longitude = -38.6000,
+                        triggerRadiusMeters = 120.0,
+                        imageUrl = "android.resource://${getApplication<Application>().packageName}/drawable/memoria_desmoronamento",
+                        isApproved = true,
+                        createdAt = System.currentTimeMillis()
+                    )
+                )
+                demoMemories.forEach { memoryDao.insertMemory(it) }
+                loadMemoriesFromDb()
+            }
+        }
     }
 
     private fun loadMemoriesFromDb() {
@@ -104,13 +171,18 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
                         category = entity.category,
                         year = entity.year,
                         authorName = entity.authorName,
+                        authorAge = entity.authorAge,
                         latitude = entity.latitude,
                         longitude = entity.longitude,
+                        triggerRadiusMeters = entity.triggerRadiusMeters,
                         imageUrl = entity.imageUrl,
-                        audioUrl = entity.audioUrl
+                        imageSource = entity.imageSource,
+                        audioUrl = entity.audioUrl,
+                        isApproved = entity.isApproved
                     )
                 }
-                _memories.value = domainMemories
+                _memories.value = domainMemories.filter { it.isApproved }
+                _pendingMemories.value = domainMemories.filter { !it.isApproved }
             }
         }
     }
@@ -121,9 +193,12 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
         category: String,
         year: String,
         authorName: String,
+        authorAge: String,
         latitude: Double, 
         longitude: Double, 
+        triggerRadiusMeters: Double = 50.0,
         imageUrl: String? = null, 
+        imageSource: String = "",
         audioUrl: String? = null
     ) {
         viewModelScope.launch {
@@ -142,14 +217,41 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
                 category = category,
                 year = year,
                 authorName = authorName,
+                authorAge = authorAge,
                 latitude = latitude,
                 longitude = longitude,
+                triggerRadiusMeters = triggerRadiusMeters,
                 imageUrl = finalImageUrl,
+                imageSource = imageSource,
                 audioUrl = finalAudioUrl,
+                isApproved = false,
                 createdAt = System.currentTimeMillis()
             )
             memoryDao.insertMemory(entity)
         }
+    }
+
+    fun approveMemory(memoryId: String, pin: String): Boolean {
+        if (!isTeacherPinValid(pin)) return false
+        viewModelScope.launch {
+            memoryDao.approveMemory(memoryId.toLong())
+        }
+        return true
+    }
+
+    fun rejectMemory(memoryId: String, pin: String): Boolean {
+        if (!isTeacherPinValid(pin)) return false
+        viewModelScope.launch {
+            memoryDao.deleteMemoryById(memoryId.toLong())
+        }
+        return true
+    }
+
+
+
+    suspend fun exportDatabaseZip(): Uri {
+        val exporter = DatabaseExporter(getApplication())
+        return exporter.export(memoryDao.getAllMemoriesOnce())
     }
 
     private fun copyToInternalStorage(uriString: String?, fileNamePrefix: String): String? {
@@ -175,7 +277,7 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
 
     // Lógica de Gravação
     fun startRecording() {
-        val file = File(getApplication<Application>().cacheDir, "recording_${System.currentTimeMillis()}.mp3")
+        val file = File(getApplication<Application>().filesDir, "recording_${System.currentTimeMillis()}.m4a")
         currentRecordingPath = file.absolutePath
         audioRecorder.start(file.absolutePath)
         _isRecording.value = true
@@ -254,21 +356,22 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun checkProximityToMemories(userLocation: Location) {
-        val triggerRadiusMeters = 50.0 
-
-        // Encontra a memória MAIS PRÓXIMA dentro do raio, conforme sugerido na auditoria técnica
-        val nearestMemory = _memories.value.map { memory ->
+        // Encontra a memória MAIS PRÓXIMA absoluta para o HUD de busca
+        val allDistances = _memories.value.map { memory ->
             val memoryLocation = Location("").apply {
                 latitude = memory.latitude
                 longitude = memory.longitude
             }
-            Pair(memory, userLocation.distanceTo(memoryLocation))
+            Triple(memory, userLocation.distanceTo(memoryLocation), userLocation.bearingTo(memoryLocation))
         }
-        .filter { it.second <= triggerRadiusMeters }
-        .minByOrNull { it.second }
 
-        val foundMemory = nearestMemory?.first
-        _distanceToActive.value = nearestMemory?.second
+        val closest = allDistances.minByOrNull { it.second }
+        _nearestMemoryDistance.value = closest?.second
+        _nearestMemoryBearing.value = closest?.third
+
+        // Encontra a memória dentro do raio para ativação
+        val foundMemory = closest?.takeIf { it.second <= it.first.triggerRadiusMeters }?.first
+        _distanceToActive.value = if (foundMemory != null) closest.second else null
 
         if (foundMemory != null && _activeMemory.value?.id != foundMemory.id) {
             _activeMemory.value = foundMemory
@@ -402,6 +505,10 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
 
     private fun stopAudio() {
         tts?.stop()
+        mediaPlayer?.stop()
+        mediaPlayer?.release()
+        mediaPlayer = null
+        _audioProgress.value = 0f
     }
 
     fun simulateMemoryAtCurrentLocation() {
@@ -412,7 +519,8 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
                 title = "Relato Encontrado!",
                 description = "Essa é uma memória georreferenciada. Imagine que agora você estaria ouvindo o relato de um morador da comunidade falando sobre as enchentes do passado.",
                 latitude = loc.latitude,
-                longitude = loc.longitude
+                longitude = loc.longitude,
+                isApproved = true
             )
         } else {
             Memory(
@@ -420,7 +528,8 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
                 title = "Relato Encontrado!",
                 description = "Essa é uma memória georreferenciada simulada sem GPS. Imagine que você está escutando um áudio histórico.",
                 latitude = 0.0,
-                longitude = 0.0
+                longitude = 0.0,
+                isApproved = true
             )
         }
         
@@ -430,10 +539,19 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
         awardGamificationPoints(newMemory)
     }
 
+    fun isTeacherPinValid(pin: String): Boolean {
+        return pin == teacherPin
+    }
+
+    fun setTeacherPin(newPin: String) {
+        teacherPin = newPin
+    }
+
     override fun onCleared() {
         super.onCleared()
         tts?.stop()
         tts?.shutdown()
+        mediaPlayer?.release()
+        mediaPlayer = null
     }
 }
-

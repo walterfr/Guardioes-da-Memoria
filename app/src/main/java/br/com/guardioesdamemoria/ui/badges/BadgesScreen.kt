@@ -8,80 +8,107 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.guardioesdamemoria.viewmodel.LocationViewModel
+import br.com.guardioesdamemoria.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BadgesScreen(viewModel: LocationViewModel) {
+fun BadgesScreen(
+    viewModel: LocationViewModel,
+    onOpenTeacher: () -> Unit = {}
+) {
     val earnedBadges by viewModel.earnedBadges.collectAsState()
     val userPoints by viewModel.userPoints.collectAsState()
+    var showTeacherPin by remember { mutableStateOf(false) }
+    var teacherPin by remember { mutableStateOf("") }
     
-    // Lista completa de insígnias possíveis
+    // Níveis de Guardião
+    val levelInfo = when {
+        userPoints < 100 -> Pair("Explorador", 100)
+        userPoints < 500 -> Pair("Guardião", 500)
+        else -> Pair("Mestre", 1000)
+    }
+
+    // Lista completa de insígnias com EMOJIS (Conforme sugestão Claude)
     val allBadges = listOf(
-        BadgeInfo("Novato", "Encontrou sua primeira memória", "🌱", 10),
-        BadgeInfo("Historiador", "Encontrou 5 memórias", "📚", 50),
-        BadgeInfo("Explorador Urbano", "Encontrou 10 memórias", "🏙️", 100),
-        BadgeInfo("Sobrevivente", "Ouviu sobre a grande enchente", "🌊", 30),
-        BadgeInfo("Guardião de Bronze", "Alcançou 100 pontos", "🥉", 100),
-        BadgeInfo("Guardião de Prata", "Alcançou 500 pontos", "🥈", 500),
-        BadgeInfo("Mestre da Memória", "Encontrou todas as memórias", "👑", 1000)
+        BadgeInfo("Primeira pista", "Encontrou sua primeira memória", "👁️", 1),
+        BadgeInfo("Pesquisador", "Encontrou 5 memórias", "🔎", 5),
+        BadgeInfo("Cartógrafo", "Encontrou 10 memórias", "🗺️", 10),
+        BadgeInfo("Arquivo vivo", "Ouviu um relato completo", "🎙️", 1),
+        BadgeInfo("Sentinela", "Alcançou 100 pontos", "🛡️", 100),
+        BadgeInfo("Veterano", "Alcançou 500 pontos", "🎖️", 500),
+        BadgeInfo("Relíquia", "Encontrou todas as memórias", "🏛️", 1000)
     )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Conquistas", fontWeight = FontWeight.Bold) }
+                title = { Text("Conquistas", fontWeight = FontWeight.Black) },
+                actions = {
+                    IconButton(onClick = { showTeacherPin = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = null, tint = Color.White.copy(alpha = 0.2f))
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = NightField, titleContentColor = Color.White)
             )
         }
     ) { padding ->
         Column(
-            modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp),
+            modifier = Modifier.padding(padding).fillMaxSize().background(NightField).padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Card de Pontuação Premium
+            // Card de Nível (Refinado)
             Card(
-                modifier = Modifier.fillMaxWidth().height(140.dp),
+                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                colors = CardDefaults.cardColors(containerColor = MemoryTeal)
             ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    // Círculos decorativos
-                    Box(modifier = Modifier.size(100.dp).offset(x = (-20).dp, y = (-20).dp).background(Color.White.copy(alpha = 0.1f), CircleShape))
-                    
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(text = "SUA PONTUAÇÃO", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
-                        Text(text = "$userPoints", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        Text(text = "PONTOS DE CONHECIMENTO", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f))
+                Column(modifier = Modifier.padding(24.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text(text = "PROGRESSO DA CAÇA", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                            Text(text = "${userPoints} XP", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = Color.White)
+                        }
+                        Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
+                            Text(text = levelInfo.first, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        }
                     }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Barra de Progresso Real de Nível
+                    val progress = (userPoints % levelInfo.second).toFloat() / levelInfo.second.toFloat()
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
+                        color = Color.White,
+                        trackColor = Color.White.copy(alpha = 0.2f)
+                    )
+                    Text(
+                        text = "${levelInfo.second - (userPoints % levelInfo.second)} XP para o próximo nível",
+                        modifier = Modifier.padding(top = 8.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
             
-            Text(
-                text = "Minhas Insígnias",
-                modifier = Modifier.align(Alignment.Start),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-
+            // Grid de Insígnias
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -89,68 +116,96 @@ fun BadgesScreen(viewModel: LocationViewModel) {
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(allBadges) { badge ->
-                    val isEarned = earnedBadges.any { it.title == badge.title }
-                    BadgeCard(badge, isEarned)
+                    val earnedBadge = earnedBadges.find { it.title == badge.title }
+                    val isEarned = earnedBadge != null
+                    
+                    // Cálculo de progresso real (Simulado aqui, no real viria do ViewModel)
+                    val badgeProgress = if (isEarned) 1f else {
+                        when (badge.title) {
+                            "Pesquisador" -> (earnedBadges.size % 5) / 5f
+                            "Cartógrafo" -> (earnedBadges.size % 10) / 10f
+                            else -> 0f
+                        }
+                    }
+
+                    BadgeCard(badge, isEarned, badgeProgress, earnedDate = "29 abr") // Exemplo de data
                 }
             }
         }
+    }
+
+    if (showTeacherPin) {
+        AlertDialog(
+            onDismissRequest = { showTeacherPin = false },
+            title = { Text("Acesso Professor") },
+            text = {
+                OutlinedTextField(
+                    value = teacherPin,
+                    onValueChange = { teacherPin = it },
+                    label = { Text("PIN") },
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (viewModel.isTeacherPinValid(teacherPin)) {
+                        showTeacherPin = false
+                        onOpenTeacher()
+                    }
+                }) {
+                    Text("Validar")
+                }
+            }
+        )
     }
 }
 
 data class BadgeInfo(val title: String, val description: String, val icon: String, val requirement: Int)
 
 @Composable
-fun BadgeCard(badge: BadgeInfo, isEarned: Boolean) {
+fun BadgeCard(badge: BadgeInfo, isEarned: Boolean, progress: Float, earnedDate: String?) {
     Card(
         modifier = Modifier.fillMaxWidth().aspectRatio(0.85f),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isEarned) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            containerColor = if (isEarned) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.03f)
         ),
-        border = if (isEarned) BorderStroke(2.dp, Brush.linearGradient(listOf(Color(0xFFFFD700), Color(0xFFFFA500)))) else null
+        border = if (isEarned) BorderStroke(1.dp, MemoryTeal.copy(alpha = 0.3f)) else null
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
+            modifier = Modifier.fillMaxSize().padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Box(
-                modifier = Modifier.size(60.dp).clip(CircleShape)
-                    .background(if (isEarned) Color(0xFFFFD700).copy(alpha = 0.1f) else Color.Gray.copy(alpha = 0.1f)),
+                modifier = Modifier.size(56.dp).clip(CircleShape)
+                    .background(if (isEarned) MemoryTeal.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = badge.icon,
-                    fontSize = 32.sp,
+                    fontSize = 28.sp,
                     modifier = Modifier.graphicsLayer(alpha = if (isEarned) 1f else 0.2f)
                 )
+                if (!isEarned) {
+                    Icon(Icons.Default.Lock, contentDescription = null, tint = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(16.dp))
+                }
             }
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            Text(
-                text = badge.title,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleSmall,
-                color = if (isEarned) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-            )
+            Text(text = badge.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = if (isEarned) Color.White else Color.White.copy(alpha = 0.3f))
             
-            Text(
-                text = badge.description,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                modifier = Modifier.padding(top = 4.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                lineHeight = 12.sp
-            )
-            
-            if (!isEarned) {
+            if (isEarned && earnedDate != null) {
+                Text(text = "Conquistada em $earnedDate", style = MaterialTheme.typography.labelSmall, color = MemoryTeal, modifier = Modifier.padding(top = 2.dp))
+            } else {
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
-                    progress = { 0f },
+                    progress = { progress },
                     modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = Color.Gray.copy(alpha = 0.2f)
+                    color = MemoryTeal,
+                    trackColor = Color.White.copy(alpha = 0.1f)
                 )
             }
         }

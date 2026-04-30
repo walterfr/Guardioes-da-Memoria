@@ -17,11 +17,11 @@ import com.google.maps.android.compose.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MapScreen(viewModel: LocationViewModel) {
+fun MapScreen(viewModel: LocationViewModel, onNavigateToCamera: () -> Unit = {}) {
     val memories by viewModel.memories.collectAsState()
     val currentLocation by viewModel.currentLocation.collectAsState()
     
-    val categories = listOf("Todas", "Enchente", "Seca", "Tempestade", "Ciclone", "Historico de Morador", "Memoria Afetiva", "Geral")
+    val categories = listOf("Todas", "Alagamento", "Seca", "Transtornos de Obras", "Desmoronamento", "Historico de Morador", "Memoria Afetiva", "Geral")
     var selectedCategory by remember { mutableStateOf("Todas") }
     
     val filteredMemories = if (selectedCategory == "Todas") memories else memories.filter { it.category == selectedCategory }
@@ -45,10 +45,10 @@ fun MapScreen(viewModel: LocationViewModel) {
                     snippet = memory.category,
                     icon = BitmapDescriptorFactory.defaultMarker(
                         when (memory.category) {
-                            "Enchente" -> BitmapDescriptorFactory.HUE_BLUE
+                            "Alagamento" -> BitmapDescriptorFactory.HUE_BLUE
                             "Seca" -> BitmapDescriptorFactory.HUE_ORANGE
-                            "Tempestade" -> BitmapDescriptorFactory.HUE_VIOLET
-                            "Ciclone" -> BitmapDescriptorFactory.HUE_AZURE
+                            "Transtornos de Obras" -> BitmapDescriptorFactory.HUE_VIOLET
+                            "Desmoronamento" -> BitmapDescriptorFactory.HUE_AZURE
                             "Historico de Morador" -> BitmapDescriptorFactory.HUE_GREEN
                             "Memoria Afetiva" -> BitmapDescriptorFactory.HUE_ROSE
                             else -> BitmapDescriptorFactory.HUE_RED
@@ -78,18 +78,18 @@ fun MapScreen(viewModel: LocationViewModel) {
             }
         }
 
-        // Overlay de Resumo (Inferior)
+        // Resumo inferior
         val newMemoriesCount by viewModel.newMemoriesCount.collectAsState()
 
         Card(
             modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp).fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "MAPA VIVO", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+                    Text(text = "Mapa vivo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
                     Text(text = "${filteredMemories.size} locais encontrados", style = MaterialTheme.typography.bodySmall)
                 }
                 
@@ -102,9 +102,9 @@ fun MapScreen(viewModel: LocationViewModel) {
                 ) {
                     androidx.compose.material3.FilledTonalButton(onClick = { 
                         viewModel.clearNewMemoriesCount()
-                        viewModel.triggerVibration()
+                        onNavigateToCamera()
                     }) {
-                        Text("EXPLORAR")
+                        Text("Ir para explorar")
                     }
                 }
             }

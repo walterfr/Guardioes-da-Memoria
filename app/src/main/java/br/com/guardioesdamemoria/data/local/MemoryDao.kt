@@ -12,6 +12,15 @@ interface MemoryDao {
     @Query("SELECT * FROM memories ORDER BY createdAt DESC")
     fun getAllMemories(): Flow<List<MemoryEntity>>
 
+    @Query("SELECT * FROM memories ORDER BY createdAt DESC")
+    suspend fun getAllMemoriesOnce(): List<MemoryEntity>
+
+    @Query("UPDATE memories SET isApproved = 1 WHERE id = :memoryId")
+    suspend fun approveMemory(memoryId: Long): Int
+
+    @Query("DELETE FROM memories WHERE id = :memoryId")
+    suspend fun deleteMemoryById(memoryId: Long): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMemory(memory: MemoryEntity)
 
