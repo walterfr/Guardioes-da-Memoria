@@ -284,10 +284,41 @@ fun CameraPreviewContent(viewModel: LocationViewModel) {
                             )
                         }
 
+                        // Feedback Qualitativo (Como me senti?)
+                        Text("Como você se sente com esse relato?", color = Color(0xFF5D4037).copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
+                        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf("Conectado", "Surpreso", "Inspirado").forEach { feeling ->
+                                var isSelected by remember { mutableStateOf(false) }
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { 
+                                        isSelected = true
+                                        viewModel.reactToMemory(memory.id.toLong(), feeling)
+                                    },
+                                    label = { Text(feeling, fontSize = 10.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MemoryTeal,
+                                        selectedLabelColor = Color.White,
+                                        containerColor = Color.Black.copy(alpha = 0.05f)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
                         // Audio Player
+                        val isAudioPlaying by viewModel.isAudioPlaying.collectAsState()
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            FilledIconButton(onClick = { viewModel.togglePlayback() }, colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFF3E2723))) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
+                            FilledIconButton(
+                                onClick = { 
+                                    if (memory.audioUrl != null) viewModel.togglePlayback() 
+                                    else viewModel.playAudio(memory.description, memory.id)
+                                }, 
+                                colors = IconButtonDefaults.filledIconButtonColors(containerColor = if (isAudioPlaying) Color.Red else Color(0xFF3E2723))
+                            ) {
+                                Icon(if (isAudioPlaying) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             LinearProgressIndicator(progress = { audioProgress }, modifier = Modifier.weight(1f).height(4.dp).clip(CircleShape), color = Color(0xFF8B4513), trackColor = Color.Black.copy(alpha = 0.1f))

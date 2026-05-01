@@ -62,7 +62,17 @@ fun MainContent(viewModel: LocationViewModel) {
 
     val noNavBarRoutes = listOf("splash", "auth_selection", "auth", "registration", "about")
 
+    val nearbyAlert by viewModel.nearbyAlert.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(nearbyAlert) {
+        nearbyAlert?.let {
+            snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Short)
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             if (currentRoute !in noNavBarRoutes) {
                 NavigationBar(

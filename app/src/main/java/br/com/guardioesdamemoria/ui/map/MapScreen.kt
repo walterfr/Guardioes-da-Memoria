@@ -1,6 +1,7 @@
 package br.com.guardioesdamemoria.ui.map
 
 import android.view.MotionEvent
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -44,10 +45,17 @@ fun MapScreen(viewModel: LocationViewModel, onNavigateToCamera: () -> Unit = {})
     var isDownloading by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf(0f) }
 
-    // Configuração do User-Agent necessária para o OSM
+    // Configuração do User-Agent e Storage necessária para o OSM
     LaunchedEffect(Unit) {
-        Configuration.getInstance().load(context, context.getSharedPreferences("osm_pref", 0))
+        val prefs = context.getSharedPreferences("osm_pref", 0)
+        Configuration.getInstance().load(context, prefs)
         Configuration.getInstance().userAgentValue = context.packageName
+        
+        // Força o uso do diretório interno do app para evitar crashes de permissão de escrita (comum em tablets/Android recente)
+        val osmPath = java.io.File(context.filesDir, "osmdroid")
+        if (!osmPath.exists()) osmPath.mkdirs()
+        Configuration.getInstance().osmdroidBasePath = osmPath
+        Configuration.getInstance().osmdroidTileCache = java.io.File(osmPath, "tiles")
     }
 
     val categories = listOf("Todas", "Alagamento", "Seca", "Transtornos de Obras", "Desmoronamento", "Relato")
@@ -79,14 +87,14 @@ fun MapScreen(viewModel: LocationViewModel, onNavigateToCamera: () -> Unit = {})
         scope.launch {
             isDownloading = true
             try {
-                // Download zooms 14 to 18 for high detail
                 cacheManager.downloadAreaAsync(context, gbjBoundingBox, 14, 18, object : CacheManager.CacheManagerCallback {
                     override fun onTaskComplete() {
                         isDownloading = false
-                        // Toast or notification could be added here
+                        Toast.makeText(context, "Download concluído!", Toast.LENGTH_SHORT).show()
                     }
                     override fun onTaskFailed(errors: Int) {
                         isDownloading = false
+                        Toast.makeText(context, "Erro no download: $errors falhas", Toast.LENGTH_LONG).show()
                     }
                     override fun updateProgress(progress: Int, currentZoomLevel: Int, zoomMin: Int, zoomMax: Int) {
                         downloadProgress = progress / 100f
@@ -96,6 +104,7 @@ fun MapScreen(viewModel: LocationViewModel, onNavigateToCamera: () -> Unit = {})
                 })
             } catch (e: Exception) {
                 isDownloading = false
+                Toast.makeText(context, "Erro crítico: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }

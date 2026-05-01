@@ -12,6 +12,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -19,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -37,6 +40,8 @@ import coil.compose.AsyncImage
 @Composable
 fun LibraryScreen(viewModel: LocationViewModel, onNavigateToRegistration: () -> Unit = {}) {
     val memories by viewModel.memories.collectAsState()
+    val isAudioPlaying by viewModel.isAudioPlaying.collectAsState()
+    val playingMemoryId by viewModel.playingMemoryId.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var selectedDecade by remember { mutableStateOf<String?>(null) }
     
@@ -130,14 +135,63 @@ fun LibraryScreen(viewModel: LocationViewModel, onNavigateToRegistration: () -> 
                         Text(selectedMemoryForDetail!!.authorName, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.weight(1f))
+                    val isThisPlaying = isAudioPlaying && playingMemoryId == selectedMemoryForDetail!!.id
                     Button(
-                        onClick = { viewModel.playAudio(selectedMemoryForDetail!!.description) },
-                        colors = ButtonDefaults.buttonColors(containerColor = MemoryTeal)
+                        onClick = { viewModel.playAudio(selectedMemoryForDetail!!.description, selectedMemoryForDetail!!.id) },
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isThisPlaying) Color.Red else MemoryTeal)
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Icon(if (isThisPlaying) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("OUVIR")
+                        Text(if (isThisPlaying) "PARAR" else "OUVIR")
                     }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // SEÇÃO DE FEEDBACK QUALITATIVO
+                Text(
+                    "Como você se sentiu com esse relato?",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("Conectado", "Surpreso", "Inspirado").forEach { feeling ->
+                        var isSelected by remember { mutableStateOf(false) }
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { 
+                                isSelected = true
+                                viewModel.reactToMemory(selectedMemoryForDetail!!.id.toLong(), feeling)
+                            },
+                            label = { Text(feeling) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MemoryTeal,
+                                selectedLabelColor = Color.White,
+                                containerColor = Color.White.copy(alpha = 0.05f),
+                                labelColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // MODERAÇÃO
+                TextButton(
+                    onClick = { 
+                        viewModel.reportMemory(selectedMemoryForDetail!!.id.toLong(), "Conteúdo inadequado")
+                        selectedMemoryForDetail = null
+                    },
+                    modifier = Modifier.alpha(0.5f)
+                ) {
+                    Icon(Icons.Default.Flag, contentDescription = null, tint = Color.Red, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Denunciar conteúdo inadequado", color = Color.Red, style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
@@ -223,9 +277,11 @@ fun LibraryScreen(viewModel: LocationViewModel, onNavigateToRegistration: () -> 
                     }
 
                     items(filteredMemories) { memory ->
+                        val isThisPlaying = isAudioPlaying && playingMemoryId == memory.id
                         MemoryItemCard(
                             memory, 
-                            onPlay = { viewModel.playAudio(memory.description) },
+                            isThisPlaying = isThisPlaying,
+                            onPlay = { viewModel.playAudio(memory.description, memory.id) },
                             onClick = { selectedMemoryForDetail = memory }
                         )
                     }
@@ -260,7 +316,7 @@ fun PolaroidCard(memory: Memory, onClick: () -> Unit) {
 }
 
 @Composable
-fun MemoryItemCard(memory: Memory, onPlay: () -> Unit, onClick: () -> Unit) {
+fun MemoryItemCard(memory: Memory, isThisPlaying: Boolean, onPlay: () -> Unit, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clickable { onClick() },
         shape = RoundedCornerShape(20.dp),
@@ -283,9 +339,9 @@ fun MemoryItemCard(memory: Memory, onPlay: () -> Unit, onClick: () -> Unit) {
             // Botão de Play direto no card
             FilledIconButton(
                 onClick = onPlay,
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MemoryTeal)
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = if (isThisPlaying) Color.Red else MemoryTeal)
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
+                Icon(if (isThisPlaying) Icons.Default.Stop else Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
             }
         }
     }

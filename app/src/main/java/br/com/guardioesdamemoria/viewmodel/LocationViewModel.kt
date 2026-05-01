@@ -41,6 +41,7 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
     private val db = AppDatabase.getDatabase(application)
     private val memoryDao = db.memoryDao()
     private val userDao = db.userDao()
+    private val reactionDao = db.reactionDao()
     
     private val audioRecorder by lazy { AudioRecorder(application) }
     private var mediaPlayer: MediaPlayer? = null
@@ -71,6 +72,12 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
 
     private val _audioProgress = MutableStateFlow(0f)
     val audioProgress: StateFlow<Float> = _audioProgress.asStateFlow()
+
+    private val _isAudioPlaying = MutableStateFlow(false)
+    val isAudioPlaying: StateFlow<Boolean> = _isAudioPlaying.asStateFlow()
+
+    private val _playingMemoryId = MutableStateFlow<String?>(null)
+    val playingMemoryId: StateFlow<String?> = _playingMemoryId.asStateFlow()
 
     // Estados de Áudio
     private val _isRecording = MutableStateFlow(false)
@@ -131,11 +138,40 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    private val _nearbyAlert = MutableStateFlow<String?>(null)
+    val nearbyAlert: StateFlow<String?> = _nearbyAlert.asStateFlow()
+
     fun selectProfile(profile: br.com.guardioesdamemoria.data.local.UserProfile) {
         viewModelScope.launch {
             userDao.updateLastUsed(profile.id, System.currentTimeMillis())
             _currentUser.value = profile
             if (profile.isTeacher && profile.pin != null) teacherPin = profile.pin
+        }
+    }
+
+    fun reactToMemory(memoryId: Long, reaction: String) {
+        val user = _currentUser.value ?: return
+        viewModelScope.launch {
+            reactionDao.insertReaction(
+                br.com.guardioesdamemoria.data.local.MemoryReactionEntity(
+                    memoryId = memoryId,
+                    userId = user.id,
+                    reaction = reaction
+                )
+            )
+        }
+    }
+
+    fun reportMemory(memoryId: Long, reason: String) {
+        val user = _currentUser.value ?: return
+        viewModelScope.launch {
+            reactionDao.insertReport(
+                br.com.guardioesdamemoria.data.local.MemoryReportEntity(
+                    memoryId = memoryId,
+                    userId = user.id,
+                    reason = reason
+                )
+            )
         }
     }
 
@@ -344,15 +380,18 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
                     _spokenTextRange.value = Pair(0, 0)
+                    _isAudioPlaying.value = true
                 }
 
                 override fun onDone(utteranceId: String?) {
                     _spokenTextRange.value = null
+                    _isAudioPlaying.value = false
                 }
 
                 @Deprecated("Deprecated in Java")
                 override fun onError(utteranceId: String?) {
                     _spokenTextRange.value = null
+                    _isAudioPlaying.value = false
                 }
 
                 override fun onRangeStart(utteranceId: String?, start: Int, end: Int, frame: Int) {
@@ -406,7 +445,13 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
         val foundMemory = closest?.takeIf { it.second <= it.first.triggerRadiusMeters }?.first
         _distanceToActive.value = if (foundMemory != null) closest.second else null
 
+        // Alerta de Proximidade (Geofencing Manual)
+        if (closest != null && closest.second < 100.0 && foundMemory == null) {
+            _nearbyAlert.value = "Você está chegando perto de: ${closest.first.title}"
+        }
+
         if (foundMemory != null && _activeMemory.value?.id != foundMemory.id) {
+            _nearbyAlert.value = null // Limpa alerta ao ativar
             _activeMemory.value = foundMemory
             triggerVibration()
             
@@ -529,19 +574,26 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun playAudio(text: String) {
+    fun playAudio(text: String, memoryId: String? = null) {
         if (isTtsReady) {
-            val params = android.os.Bundle()
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "memory_utterance")
+            if (_isAudioPlaying.value && (_playingMemoryId.value == memoryId || memoryId == null)) {
+                stopAudio()
+            } else {
+                val params = android.os.Bundle()
+                _playingMemoryId.value = memoryId
+                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "memory_utterance")
+            }
         }
     }
 
-    private fun stopAudio() {
+    fun stopAudio() {
         tts?.stop()
         mediaPlayer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null
         _audioProgress.value = 0f
+        _isAudioPlaying.value = false
+        _playingMemoryId.value = null
     }
 
     fun simulateMemoryAtCurrentLocation() {
