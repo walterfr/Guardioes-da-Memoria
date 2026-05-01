@@ -32,6 +32,7 @@ import br.com.guardioesdamemoria.ui.library.LibraryScreen
 import br.com.guardioesdamemoria.ui.badges.BadgesScreen
 import br.com.guardioesdamemoria.ui.moderation.ModerationScreen
 import br.com.guardioesdamemoria.ui.auth.AuthScreen
+import br.com.guardioesdamemoria.ui.auth.ProfileSelectionScreen
 import br.com.guardioesdamemoria.ui.about.AboutScreen
 import br.com.guardioesdamemoria.viewmodel.LocationViewModel
 import br.com.guardioesdamemoria.ui.theme.GuardioesDaMemoriaTheme
@@ -59,7 +60,7 @@ fun MainContent(viewModel: LocationViewModel) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val noNavBarRoutes = listOf("splash", "auth", "registration", "about")
+    val noNavBarRoutes = listOf("splash", "auth_selection", "auth", "registration", "about")
 
     Scaffold(
         bottomBar = {
@@ -108,12 +109,23 @@ fun MainContent(viewModel: LocationViewModel) {
             composable("splash") {
                 SplashScreen(
                     viewModel = viewModel,
-                    onFinish = { navController.navigate("auth") },
+                    onFinish = { navController.navigate("auth_selection") },
                     onTeacherAccess = {
                         teacherMode = true
                         navController.navigate("moderation")
                     },
                     onAboutClick = { navController.navigate("about") }
+                )
+            }
+            composable("auth_selection") {
+                ProfileSelectionScreen(
+                    viewModel = viewModel,
+                    onNavigateToRegistration = { navController.navigate("auth") },
+                    onProfileSelected = { 
+                        navController.navigate("camera") {
+                            popUpTo("auth_selection") { inclusive = true }
+                        }
+                    }
                 )
             }
             composable("about") {

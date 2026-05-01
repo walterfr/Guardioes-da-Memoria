@@ -110,13 +110,16 @@ fun AuthScreen(
                     }
 
                     Button(
-                        onClick = { onAuthSuccess(isTeacherSelection!!) },
+                        onClick = { 
+                            viewModel.saveProfile(name, school, isTeacherSelection!!, generatedPin)
+                            onAuthSuccess(isTeacherSelection!!) 
+                        },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MemoryTeal),
                         enabled = name.isNotBlank() && (if (isTeacherSelection == true) !generatedPin.isNullOrBlank() else true)
                     ) {
-                        Text("ENTRAR NA JORNADA", fontWeight = FontWeight.Black)
+                        Text("CRIAR PERFIL E ENTRAR", fontWeight = FontWeight.Black)
                     }
 
                     TextButton(onClick = { isTeacherSelection = null; generatedPin = null }) {

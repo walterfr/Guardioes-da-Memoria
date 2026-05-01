@@ -25,7 +25,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import br.com.guardioesdamemoria.domain.model.Memory
 import br.com.guardioesdamemoria.viewmodel.LocationViewModel
 import br.com.guardioesdamemoria.ui.theme.*
@@ -55,6 +57,91 @@ fun LibraryScreen(viewModel: LocationViewModel, onNavigateToRegistration: () -> 
     }
 
     val featuredMemories = memories.take(3) // Exemplo: Primeiras 3 são destaque
+
+    var selectedMemoryForDetail by remember { mutableStateOf<Memory?>(null) }
+    val sheetState = rememberModalBottomSheetState()
+
+    if (selectedMemoryForDetail != null) {
+        ModalBottomSheet(
+            onDismissRequest = { selectedMemoryForDetail = null },
+            sheetState = sheetState,
+            containerColor = NightPanel,
+            contentColor = Color.White
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+                    .padding(bottom = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                AsyncImage(
+                    model = selectedMemoryForDetail!!.imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(240.dp)
+                        .clip(RoundedCornerShape(16.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = selectedMemoryForDetail!!.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                    Text(selectedMemoryForDetail!!.category, color = MemoryTeal, fontWeight = FontWeight.Bold)
+                    Text(" • ", color = Color.White.copy(alpha = 0.3f))
+                    Text(selectedMemoryForDetail!!.year, color = Color.White.copy(alpha = 0.6f))
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Surface(
+                    color = Color.White.copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = selectedMemoryForDetail!!.description,
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyLarge,
+                        lineHeight = 24.sp
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(40.dp).clip(CircleShape).background(MemoryTeal),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(selectedMemoryForDetail!!.authorName.take(1), fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("Relatado por", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f))
+                        Text(selectedMemoryForDetail!!.authorName, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Button(
+                        onClick = { viewModel.playAudio(selectedMemoryForDetail!!.description) },
+                        colors = ButtonDefaults.buttonColors(containerColor = MemoryTeal)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("OUVIR")
+                    }
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -127,7 +214,7 @@ fun LibraryScreen(viewModel: LocationViewModel, onNavigateToRegistration: () -> 
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 items(featuredMemories) { memory ->
-                                    PolaroidCard(memory)
+                                    PolaroidCard(memory, onClick = { selectedMemoryForDetail = memory })
                                 }
                             }
                             Spacer(modifier = Modifier.height(24.dp))
@@ -136,7 +223,11 @@ fun LibraryScreen(viewModel: LocationViewModel, onNavigateToRegistration: () -> 
                     }
 
                     items(filteredMemories) { memory ->
-                        MemoryItemCard(memory, onPlay = { viewModel.togglePlayback() })
+                        MemoryItemCard(
+                            memory, 
+                            onPlay = { viewModel.playAudio(memory.description) },
+                            onClick = { selectedMemoryForDetail = memory }
+                        )
                     }
                 }
             }
@@ -145,10 +236,10 @@ fun LibraryScreen(viewModel: LocationViewModel, onNavigateToRegistration: () -> 
 }
 
 @Composable
-fun PolaroidCard(memory: Memory) {
+fun PolaroidCard(memory: Memory, onClick: () -> Unit) {
     // Polaroid Style Card (Levemente rotacionado)
     Card(
-        modifier = Modifier.width(160.dp).graphicsLayer(rotationZ = -2f),
+        modifier = Modifier.width(160.dp).graphicsLayer(rotationZ = -2f).clickable { onClick() },
         shape = RoundedCornerShape(4.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
@@ -169,9 +260,9 @@ fun PolaroidCard(memory: Memory) {
 }
 
 @Composable
-fun MemoryItemCard(memory: Memory, onPlay: () -> Unit) {
+fun MemoryItemCard(memory: Memory, onPlay: () -> Unit, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clickable { onClick() },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f))
     ) {

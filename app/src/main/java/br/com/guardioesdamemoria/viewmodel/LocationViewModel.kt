@@ -40,6 +40,7 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)
     private val db = AppDatabase.getDatabase(application)
     private val memoryDao = db.memoryDao()
+    private val userDao = db.userDao()
     
     private val audioRecorder by lazy { AudioRecorder(application) }
     private var mediaPlayer: MediaPlayer? = null
@@ -83,6 +84,12 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
     private val _userPoints = MutableStateFlow(0)
     val userPoints: StateFlow<Int> = _userPoints.asStateFlow()
 
+    private val _profiles = MutableStateFlow<List<br.com.guardioesdamemoria.data.local.UserProfile>>(emptyList())
+    val profiles: StateFlow<List<br.com.guardioesdamemoria.data.local.UserProfile>> = _profiles.asStateFlow()
+
+    private val _currentUser = MutableStateFlow<br.com.guardioesdamemoria.data.local.UserProfile?>(null)
+    val currentUser: StateFlow<br.com.guardioesdamemoria.data.local.UserProfile?> = _currentUser.asStateFlow()
+
     private val _recentBadge = MutableStateFlow<Badge?>(null)
     val recentBadge: StateFlow<Badge?> = _recentBadge.asStateFlow()
 
@@ -104,6 +111,32 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
         tts = TextToSpeech(application, this)
         loadMemoriesFromDb()
         checkAndInsertDemoMemories()
+        loadProfiles()
+    }
+
+    private fun loadProfiles() {
+        viewModelScope.launch {
+            userDao.getAllProfiles().collect {
+                _profiles.value = it
+            }
+        }
+    }
+
+    fun saveProfile(name: String, school: String, isTeacher: Boolean, pin: String? = null) {
+        viewModelScope.launch {
+            val profile = br.com.guardioesdamemoria.data.local.UserProfile(name = name, school = school, isTeacher = isTeacher, pin = pin)
+            userDao.insertProfile(profile)
+            _currentUser.value = profile
+            if (isTeacher && pin != null) teacherPin = pin
+        }
+    }
+
+    fun selectProfile(profile: br.com.guardioesdamemoria.data.local.UserProfile) {
+        viewModelScope.launch {
+            userDao.updateLastUsed(profile.id, System.currentTimeMillis())
+            _currentUser.value = profile
+            if (profile.isTeacher && profile.pin != null) teacherPin = profile.pin
+        }
     }
 
     private fun checkAndInsertDemoMemories() {
@@ -496,7 +529,7 @@ class LocationViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun playAudio(text: String) {
+    fun playAudio(text: String) {
         if (isTtsReady) {
             val params = android.os.Bundle()
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "memory_utterance")
